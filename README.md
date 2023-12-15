@@ -19,13 +19,13 @@ cde credential create --name docker-creds-max-parallel \
                       --docker-username pauldefusco
 
 cde resource create --name dex-spark-dbldatagen-max-parallel \
-                    --image pauldefusco/dex-spark-runtime-3.2.3-7.2.15.8:1.20.0-b15-dbldatagen-002 \
+                    --image pauldefusco/dex-spark-runtime-3.2.3-7.2.15.8:1.20.0-b15-great-expectations-data-quality \
                     --image-engine spark3 \
                     --type custom-runtime-image
 
-cde resource create --name maxparallel
+cde resource create --name max_parallel
 
-cde resource upload --name maxparallel \
+cde resource upload --name max_parallel \
                     --local-path code/1_max_parallelism/datagen.py \
                     --local-path code/1_max_parallelism/utils.py \
                     --local-path code/1_max_parallelism/etl.py \
@@ -35,12 +35,13 @@ cde resource upload --name maxparallel \
 cde job create --name datagen-max-parallel \
                --type spark \
                --application-file datagen.py \
-               --mount-1-resource max_parallel
+               --mount-1-resource max_parallel \
+               --runtime-image-resource-name dex-spark-dbldatagen-max-parallel
 
 cde job create --name etl \
                --type spark \
                --application-file etl.py \
-               --mount-1-prefix max_parallel
+               --mount-1-resource max_parallel
 
 cde job run --name datagen-max-parallel \
             --executor-cores 4 \

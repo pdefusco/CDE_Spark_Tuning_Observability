@@ -57,7 +57,13 @@ class BankDataGen:
         self.datagen_partitions = datagen_partitions
         self.datagen_rows = datagen_rows
 
-    def bankDataGen(self, shuffle_partitions_requested = 8, partitions_requested = self.datagen_partitions, data_rows = self.datagen_rows):
+    def bankDataGen(self, shuffle_partitions_requested = 8, partitions_requested = None, data_rows = None):
+
+        if partitions_requested is None:
+            partitions_requested = self.datagen_partitions
+
+        if data_rows is None:
+            data_rows = self.datagen_rows
 
         # setup use of Faker
         FakerTextUS = FakerTextFactory(locale=['en_US'], providers=[bank])

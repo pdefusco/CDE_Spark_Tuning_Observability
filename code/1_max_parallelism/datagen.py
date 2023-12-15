@@ -48,7 +48,7 @@ import sys, random, os, json, random, configparser
 config = configparser.ConfigParser()
 config.read('/app/mount/parameters.conf')
 data_lake_name=config.get("general","data_lake_name")
-demo=config.get("general","max_parallel")
+demo=config.get("general","demo")
 username=config.get("general","username")
 
 print("\nRunning as Username: ", username)
