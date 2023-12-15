@@ -57,8 +57,8 @@ dbname = "CDE_DEMO_{0}_{1}".format(username, demo)
 
 print("\nUsing DB Name: ", dbname)
 
-datagen_partitions = sys.argv[1]
-datagen_rows = sys.argv[2]
+datagen_partitions = int(sys.argv[1])
+datagen_rows = int(sys.argv[2])
 
 print("Number of Datagen Partitions: {}\n".format(datagen_partitions))
 print("Number of Rows Requested: {}\n".format(datagen_rows))
@@ -102,7 +102,6 @@ bankTransactionsDf = dg.bankDataGen()
 #    .using("iceberg").tableProperty("write.format.default", "parquet").createOrReplace()
 
 bankTransactionsDf.write.mode("overwrite").\
-                    partitionBy("month").\
                     saveAsTable("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username), format="parquet")
 
 print("BATCH LOAD JOB COMPLETED\n")

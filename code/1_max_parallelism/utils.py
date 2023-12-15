@@ -72,14 +72,14 @@ class BankDataGen:
         self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_partitions_requested)
 
         fakerDataspec = (DataGenerator(self.spark, rows=data_rows, partitions=partitions_requested)
-                    .withColumn("name", percentNulls=0.1, text=FakerTextUS("name") )
-                    .withColumn("address", text=FakerTextUS("address" ))
-                    .withColumn("email", text=FakerTextUS("ascii_company_email") )
-                    .withColumn("aba_routing", text=FakerTextUS("aba" ))
-                    .withColumn("bank_country", text=FakerTextUS("bank_country") )
-                    .withColumn("account_no", text=FakerTextUS("bban" ))
-                    .withColumn("int_account_no", text=FakerTextUS("iban") )
-                    .withColumn("swift11", text=FakerTextUS("swift11" ))
+                    .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name") )
+                    .withColumn("address", "string", text=FakerTextUS("address" ))
+                    .withColumn("email", "string", text=FakerTextUS("ascii_company_email") )
+                    .withColumn("aba_routing", "string", text=FakerTextUS("aba" ))
+                    .withColumn("bank_country", "string", text=FakerTextUS("bank_country") )
+                    .withColumn("account_no", "string", text=FakerTextUS("bban" ))
+                    .withColumn("int_account_no", "string", text=FakerTextUS("iban") )
+                    .withColumn("swift11", "string", text=FakerTextUS("swift11" ))
                     .withColumn("credit_card_number", text=FakerTextUS("credit_card_number") )
                     .withColumn("credit_card_provider", text=FakerTextUS("credit_card_provider") )
                     .withColumn("credit_card_balance", "decimal", minValue=0.01, maxValue=100000, random=True)
@@ -94,6 +94,7 @@ class BankDataGen:
                     .withColumn("transaction_currency", values=["USD", "EUR", "KWD", "BHD", "GBP", "CHF", "MEX"])
                     .withColumn("transaction_amount", "decimal", minValue=0.01, maxValue=30000, random=True)
                     )
+
         df = fakerDataspec.build()
 
         return df
