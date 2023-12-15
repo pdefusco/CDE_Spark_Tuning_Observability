@@ -76,25 +76,25 @@ spark = SparkSession \
 
 bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
 
-print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions())
+print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions()))
 
 #---------------------------------------------------
 #               CAUSING THE SHUFFLE..
 #---------------------------------------------------
 
-selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing', \
-                            'bank_country', 'transaction_amount', \
-                            'transaction_currency', 'credit_card_provider', \
-                            'event_type', 'event_ts', 'credit_card_balance', \
-                            'checking_acc_balance', 'checking_acc_2_balance', \
+selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
+                            'bank_country', 'transaction_amount',
+                            'transaction_currency', 'credit_card_provider',
+                            'event_type', 'event_ts', 'credit_card_balance',
+                            'checking_acc_balance', 'checking_acc_2_balance',
                             'savings_acc_balance', 'savings_acc_2_balance')
 
 print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
-byCountryDf = selectDf.select('name', 'address', 'bank_country', \
-                                'transaction_amount', 'transaction_currency', \
-                                'event_type', 'event_ts', 'credit_card_balance', \
-                                'checking_acc_balance', 'checking_acc_2_balance', \
-                                'savings_acc_balance', 'savings_acc_2_balance') \
+byCountryDf = selectDf.select('name', 'address', 'bank_country',
+                                'transaction_amount', 'transaction_currency',
+                                'event_type', 'event_ts', 'credit_card_balance',
+                                'checking_acc_balance', 'checking_acc_2_balance',
+                                'savings_acc_balance', 'savings_acc_2_balance')\
                                 .groupBy('bank_country') \
                                 .agg({'transaction_amount':'mean'})
 
