@@ -23,25 +23,26 @@ cde resource create --name dex-spark-dbldatagen-max-parallel \
                     --image-engine spark3 \
                     --type custom-runtime-image
 
-cde resource create max_parallel
+cde resource create --name maxparallel
 
-cde resource upload --local-path code/datagen.py \
-                    --local-path code/utils.py \
-                    --local-path code/etl.py \
-                    --local-path code/parameters.conf \
-                    --local-path code/airflow.py
+cde resource upload --name maxparallel \
+                    --local-path code/1_max_parallelism/datagen.py \
+                    --local-path code/1_max_parallelism/utils.py \
+                    --local-path code/1_max_parallelism/etl.py \
+                    --local-path code/1_max_parallelism/parameters.conf \
+                    --local-path code/1_max_parallelism/airflow.py
 
-cde job create --name datagen_max_parallel \
+cde job create --name datagen-max-parallel \
                --type spark \
                --application-file datagen.py \
-               --mount-1-prefix max_parallel
+               --mount-1-resource max_parallel
 
 cde job create --name etl \
                --type spark \
                --application-file etl.py \
                --mount-1-prefix max_parallel
 
-cde job run --name datagen_max_parallel \
+cde job run --name datagen-max-parallel \
             --executor-cores 4 \
             --executor-memory "4g" \
             --min-executors 1 \

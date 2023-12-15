@@ -78,13 +78,13 @@ start = DummyOperator(
 step1 = CDEJobRunOperator(
   task_id='datagen',
   dag=max_parallel_dag,
-  job_name='datagen-max-parallel-{}'.format(username) #job_name needs to match the name assigned to the Spark CDE Job in the CDE UI
+  job_name='datagen-max-parallel' #job_name needs to match the name assigned to the Spark CDE Job in the CDE UI
 )
 
 step2 = CDEJobRunOperator(
     task_id='etl',
     dag=max_parallel_dag,
-    job_name='datagen-etl-{}'.format(username) #job_name needs to match the name assigned to the Spark CDE Job in the CDE UI
+    job_name='etl' #job_name needs to match the name assigned to the Spark CDE Job in the CDE UI
 )
 
 end = DummyOperator(
