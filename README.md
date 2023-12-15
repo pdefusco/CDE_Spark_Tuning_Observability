@@ -10,6 +10,58 @@
     - Set higher initial executors
     - Salt table and rerun and see if performance improves
 
+#### Instructions
+
+```
+cde credential create --name docker-creds-max-parallel \
+                      --type docker-basic \
+                      --docker-server hub.docker.com \
+                      --docker-username pauldefusco
+
+cde resource create --name dex-spark-dbldatagen-max-parallel \
+                    --image pauldefusco/dex-spark-runtime-3.2.3-7.2.15.8:1.20.0-b15-dbldatagen-002 \
+                    --image-engine spark3 \
+                    --type custom-runtime-image
+
+cde resource create max_parallel
+
+cde resource upload --local-path code/datagen.py \
+                    --local-path code/utils.py \
+                    --local-path code/etl.py \
+                    --local-path code/parameters.conf \
+                    --local-path code/airflow.py
+
+cde job create --name datagen_max_parallel \
+               --type spark \
+               --application-file datagen.py \
+               --mount-1-prefix max_parallel
+
+cde job create --name etl \
+               --type spark \
+               --application-file etl.py \
+               --mount-1-prefix max_parallel
+
+cde job run --name datagen_max_parallel \
+            --executor-cores 4 \
+            --executor-memory "4g" \
+            --min-executors 1 \
+            --max-executors 6 \
+            --arg 100 \
+            --arg 1000000
+
+cde job run --name etl \
+            --executor-cores 10 \
+            --executor-memory "8g" \
+            --min-executors 1 \
+            --max-executors 10 \
+            --driver-cores 2 \
+            --driver-memory "2g"
+```
+
+
+
+
+
 2. Caching Right
   - Run Datagen to create data at scale; create hive partitions
   - Run same job as above without caching.

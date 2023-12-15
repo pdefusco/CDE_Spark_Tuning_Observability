@@ -46,7 +46,7 @@ import sys, random, os, json, random, configparser
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
-config.read('/app/mount/parameters.conf')
+config.read('/app/mount/jobCode/parameters.conf')
 data_lake_name=config.get("general","data_lake_name")
 demo=config.get("general","max_parallel")
 username=config.get("general","username")
@@ -56,12 +56,6 @@ print("\nRunning as Username: ", username)
 dbname = "CDE_DEMO_{0}_{1}".format(username, demo)
 
 print("\nUsing DB Name: ", dbname)
-
-datagen_partitions = sys.argv[1]
-datagen_rows = sys.argv[2]
-
-print("Number of Datagen Partitions: {}\n".format(datagen_partitions))
-print("Number of Rows Requested: {}\n".format(datagen_rows))
 
 #---------------------------------------------------
 #               CREATE SPARK SESSION WITH ICEBERG
@@ -77,32 +71,38 @@ spark = SparkSession \
     .getOrCreate()
 
 #---------------------------------------------------
-#       SQL CLEANUP: DATABASES, TABLES, VIEWS
+#               LOAD DATA
 #---------------------------------------------------
 
-print("JOB STARTED...")
-spark.sql("DROP DATABASE IF EXISTS {} CASCADE".format(dbname))
+bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
 
-spark.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
-
-print("SHOW DATABASES LIKE '{}'".format(dbname))
-spark.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
-print("\n")
+print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions())
 
 #---------------------------------------------------
-#               CREATE BATCH DATA
+#               CAUSING THE SHUFFLE..
 #---------------------------------------------------
 
-print("CREATING BANKING TRANSACTIONS\n")
+selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing', \
+                            'bank_country', 'transaction_amount', \
+                            'transaction_currency', 'credit_card_provider', \
+                            'event_type', 'event_ts', 'credit_card_balance', \
+                            'checking_acc_balance', 'checking_acc_2_balance', \
+                            'savings_acc_balance', 'savings_acc_2_balance')
 
-dg = BankDataGen(spark, username, datagen_partitions, datagen_rows)
+print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
+byCountryDf = selectDf.select('name', 'address', 'bank_country', \
+                                'transaction_amount', 'transaction_currency', \
+                                'event_type', 'event_ts', 'credit_card_balance', \
+                                'checking_acc_balance', 'checking_acc_2_balance', \
+                                'savings_acc_balance', 'savings_acc_2_balance') \
+                                .groupBy('bank_country') \
+                                .agg({'transaction_amount':'mean'})
 
-bankTransactionsDf = dg.bankDataGen()
-#bankTransactionsDf.writeTo("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))\
-#    .using("iceberg").tableProperty("write.format.default", "parquet").createOrReplace()
+print("SORTING COUNTRIES BY AVG TRANSACTION")
+byCountryDf_sorted = byCountryDf.sort('avg(transaction_amount)', ascending=[True])
 
-bankTransactionsDf.write.mode("overwrite").\
-                    partitionBy("month").\
-                    saveAsTable("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username), format="parquet")
+print("AVERAGE TRANSACTION AMOUNT BY CURRENCY")
+byCurrencyDf = byCountryDf_sorted.groupBy('transaction_currency') \
+                            .agg({'credit_card_balance':'mean'})
 
-print("BATCH LOAD JOB COMPLETED\n")
+byCurrencyDf.show()
