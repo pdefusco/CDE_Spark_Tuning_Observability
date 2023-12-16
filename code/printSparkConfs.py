@@ -1,5 +1,5 @@
 #****************************************************************************
-# (C) Cloudera, Inc. 2020-2023
+# (C) Cloudera, Inc. 2020-2022
 #  All rights reserved.
 #
 #  Applicable Open Source License: GNU Affero General Public License v3.0
@@ -37,37 +37,8 @@
 # #  Author(s): Paul de Fusco
 #***************************************************************************/
 
-from os.path import exists
 from pyspark.sql import SparkSession
-import pyspark.sql.functions as F
-from utils import *
-from datetime import datetime
-import sys, random, os, json, random, configparser
-
-## CDE PROPERTIES
-config = configparser.ConfigParser()
-config.read('/app/mount/parameters.conf')
-data_lake_name=config.get("general","data_lake_name")
-demo=config.get("general","demo")
-username=config.get("general","username")
-
-print("\nRunning as Username: ", username)
-
-dbname = "CDE_DEMO_{0}_{1}".format(username, demo)
-
-print("\nUsing DB Name: ", dbname)
-
-datagen_partitions = int(sys.argv[1])
-datagen_rows = int(sys.argv[2])
-skew = sys.argv[3]
-
-print("Number of Datagen Partitions: {}\n".format(datagen_partitions))
-print("Number of Rows Requested: {}\n".format(datagen_rows))
-print("Skew Option Selected: ".format(skew)))
-
-#---------------------------------------------------
-#               CREATE SPARK SESSION WITH ICEBERG
-#---------------------------------------------------
+from pyspark.sql.types import Row, StructField, StructType, StringType, IntegerType
 
 spark = SparkSession \
     .builder \
@@ -78,37 +49,66 @@ spark = SparkSession \
     .getOrCreate()
 
 #---------------------------------------------------
-#       SQL CLEANUP: DATABASES, TABLES, VIEWS
+#               PRINT CONFS
 #---------------------------------------------------
 
-print("JOB STARTED...")
-spark.sql("DROP DATABASE IF EXISTS {} CASCADE".format(dbname))
-
-spark.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
-
-print("SHOW DATABASES LIKE '{}'".format(dbname))
-spark.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
-print("\n")
+print("ALL SPARK CONFS")
+print(spark.sparkContext.getConf().getAll())
 
 #---------------------------------------------------
-#               CREATE BATCH DATA
+#               SIMPLE SQL
 #---------------------------------------------------
 
-print("CREATING BANKING TRANSACTIONS\n")
+# A list of Rows. Infer schema from the first row, create a DataFrame and print the schema
+rows = [Row(name="John", age=19), Row(name="Smith", age=23), Row(name="Sarah", age=18)]
+some_df = spark.createDataFrame(rows)
+some_df.printSchema()
 
-dg = BankDataGen(spark, username, datagen_partitions, datagen_rows)
+# A list of tuples
+tuples = [("John", 19), ("Smith", 23), ("Sarah", 18)]
 
+# Schema with two fields - person_name and person_age
+schema = StructType([StructField("person_name", StringType(), False),
+                    StructField("person_age", IntegerType(), False)])
 
-#bankTransactionsDf.writeTo("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))\
-#    .using("iceberg").tableProperty("write.format.default", "parquet").createOrReplace()
+# Create a DataFrame by applying the schema to the RDD and print the schema
+another_df = spark.createDataFrame(tuples, schema)
+another_df.printSchema()
 
-if skew is not None:
-    bankTransactionsDf = dg.bankDataGenSkewed()
-    bankTransactionsDf.write.mode("overwrite").\
-                        saveAsTable("{0}.BANKING_TRANSACTIONS_SKEWED_{1}".format(dbname, username), format="parquet")
-else:
-    bankTransactionsDf = dg.bankDataGen()
-    bankTransactionsDf.write.mode("overwrite").\
-                        saveAsTable("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username), format="parquet")
+for each in another_df.collect():
+    print(each[0])
 
-print("BATCH LOAD JOB COMPLETED\n")
+#---------------------------------------------------
+#               LOAD DATA
+#---------------------------------------------------
+
+demo = "max_parallel"
+username = "pdefusco_dec_23"
+dbname = "CDE_DEMO_{0}_{1}".format(username, demo)
+
+print(dbname)
+
+bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
+
+print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions()))
+
+#---------------------------------------------------
+#               CAUSING THE SHUFFLE..
+#---------------------------------------------------
+
+# Narrow Transformation
+selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
+                            'bank_country', 'transaction_amount',
+                            'transaction_currency', 'credit_card_provider',
+                            'event_type', 'event_ts', 'credit_card_balance',
+                            'checking_acc_balance', 'checking_acc_2_balance',
+                            'savings_acc_balance', 'savings_acc_2_balance')
+
+# Wide Transformation
+print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
+byCountryDf = selectDf.groupBy('transaction_currency') \
+                      .agg({'transaction_amount':'mean'})
+
+byCountryDf.show()
+byCountryDf.count()
+spark.stop()

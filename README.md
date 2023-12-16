@@ -8,7 +8,7 @@
     - Use DA with different min max executor count
     - No DA
     - Set higher initial executors
-    - Salt table and rerun and see if performance improves
+    - Salt table and rerun and make performance improves
 
 #### Instructions
 
@@ -29,8 +29,7 @@ cde resource upload --name max_parallel \
                     --local-path code/1_max_parallelism/datagen.py \
                     --local-path code/1_max_parallelism/utils.py \
                     --local-path code/1_max_parallelism/etl.py \
-                    --local-path code/1_max_parallelism/parameters.conf \
-                    --local-path code/1_max_parallelism/airflow.py
+                    --local-path code/1_max_parallelism/parameters.conf
 
 cde job create --name datagen-max-parallel \
                --type spark \
@@ -44,12 +43,34 @@ cde job create --name etl \
                --mount-1-resource max_parallel
 
 cde job run --name datagen-max-parallel \
-            --executor-cores 4 \
-            --executor-memory "4g" \
+            --executor-cores 10 \
+            --executor-memory "5g" \
             --min-executors 1 \
-            --max-executors 6 \
+            --max-executors 20 \
             --arg 100 \
-            --arg 1000000
+            --arg 1000000000
+
+cde job run --name datagen-max-parallel \
+            --executor-cores 10 \
+            --executor-memory "5g" \
+            --min-executors 1 \
+            --max-executors 20 \
+            --arg 100 \
+            --arg 100000 \
+            --arg True
+
+
+## Without DA:
+
+cde job run --name etl \
+            --executor-cores 10 \
+            --executor-memory "8g" \
+            --driver-cores 2 \
+            --driver-memory "2g" \
+            --conf spark.dynamicAllocation.enabled=False
+            --conf=spark.executor.instances=5
+
+## With DA:
 
 cde job run --name etl \
             --executor-cores 10 \
@@ -58,6 +79,28 @@ cde job run --name etl \
             --max-executors 10 \
             --driver-cores 2 \
             --driver-memory "2g"
+
+cde job run --name etl
+
+
+
+## PRINT ALL SPARK CONFS
+
+cde spark submit code/printSparkConfs.py
+
+cde spark submit code/printSparkConfs.py --conf spark.dynamicAllocation.enabled=False --conf=spark.executor.instances=4
+
+cde resource create --name sparkconfs_resource
+cde resource upload --name sparkconfs_resource --local-path code/printSparkConfs.py
+
+cde job create --name printAllConfs --type spark --application-file printSparkConfs.py --mount-1-resource sparkconfs_resource
+
+cde job run --name printAllConfs
+
+cde job run --name printAllConfs --conf spark.dynamicAllocation.enabled=False --conf=spark.executor.instances=4
+
+
+
 ```
 
 

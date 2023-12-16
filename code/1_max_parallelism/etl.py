@@ -40,13 +40,12 @@
 from os.path import exists
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from utils import *
 from datetime import datetime
 import sys, random, os, json, random, configparser
 
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
-config.read('/app/mount/jobCode/parameters.conf')
+config.read('/app/mount/parameters.conf')
 data_lake_name=config.get("general","data_lake_name")
 demo=config.get("general","demo")
 username=config.get("general","username")
@@ -67,7 +66,6 @@ spark = SparkSession \
     .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")\
     .config("spark.sql.catalog.spark_catalog.type", "hive")\
     .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")\
-    .config("spark.kubernetes.access.hadoopFileSystems", data_lake_name)\
     .getOrCreate()
 
 #---------------------------------------------------
@@ -82,6 +80,7 @@ print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions()))
 #               CAUSING THE SHUFFLE..
 #---------------------------------------------------
 
+# Narrow Transformation
 selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
                             'bank_country', 'transaction_amount',
                             'transaction_currency', 'credit_card_provider',
@@ -89,20 +88,16 @@ selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
                             'checking_acc_balance', 'checking_acc_2_balance',
                             'savings_acc_balance', 'savings_acc_2_balance')
 
+# Wide Transformation
 print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
-byCountryDf = selectDf.select('name', 'address', 'bank_country',
-                                'transaction_amount', 'transaction_currency',
-                                'event_type', 'event_ts', 'credit_card_balance',
-                                'checking_acc_balance', 'checking_acc_2_balance',
-                                'savings_acc_balance', 'savings_acc_2_balance')\
-                                .groupBy('bank_country') \
-                                .agg({'transaction_amount':'mean'})
+byCountryDf = selectDf.groupBy('transaction_currency') \
+                      .agg({'transaction_amount':'mean'})
 
-print("SORTING COUNTRIES BY AVG TRANSACTION")
-byCountryDf_sorted = byCountryDf.sort('avg(transaction_amount)', ascending=[True])
+#print("SORTING COUNTRIES BY AVG TRANSACTION")
+#byCountryDf_sorted = byCountryDf.sort('avg(transaction_amount)', ascending=[True])
 
-print("AVERAGE TRANSACTION AMOUNT BY CURRENCY")
-byCurrencyDf = byCountryDf_sorted.groupBy('transaction_currency') \
-                            .agg({'credit_card_balance':'mean'})
+#print("AVERAGE TRANSACTION AMOUNT BY CURRENCY")
+#byCurrencyDf = byCountryDf_sorted.groupBy('transaction_currency') \
+#                            .agg({'credit_card_balance':'mean'})
 
-byCurrencyDf.show()
+byCountryDf.show()

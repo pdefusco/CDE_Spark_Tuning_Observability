@@ -72,7 +72,7 @@ class BankDataGen:
         self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_partitions_requested)
 
         fakerDataspec = (DataGenerator(self.spark, rows=data_rows, partitions=partitions_requested)
-                    .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name") )
+                    .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name"), dist=skew )
                     .withColumn("address", "string", text=FakerTextUS("address" ))
                     .withColumn("email", "string", text=FakerTextUS("ascii_company_email") )
                     .withColumn("aba_routing", "string", text=FakerTextUS("aba" ))
@@ -92,6 +92,48 @@ class BankDataGen:
                     .withColumn("longitude", "float", minValue=-180, maxValue=180, random=True)
                     .withColumn("latitude", "float", minValue=-90, maxValue=90, random=True)
                     .withColumn("transaction_currency", values=["USD", "EUR", "KWD", "BHD", "GBP", "CHF", "MEX"])
+                    .withColumn("transaction_amount", "decimal", minValue=0.01, maxValue=30000, random=True)
+                    )
+
+        df = fakerDataspec.build()
+
+        return df
+
+    def bankDataGenSkewed(self, shuffle_partitions_requested = 8, partitions_requested = None, data_rows = None):
+
+        if partitions_requested is None:
+            partitions_requested = self.datagen_partitions
+
+        if data_rows is None:
+            data_rows = self.datagen_rows
+
+        # setup use of Faker
+        FakerTextUS = FakerTextFactory(locale=['en_US'], providers=[bank])
+
+        # partition parameters etc.
+        self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_partitions_requested)
+
+        fakerDataspec = (DataGenerator(self.spark, rows=data_rows, partitions=partitions_requested)
+                    .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name"))
+                    .withColumn("address", "string", text=FakerTextUS("address" ))
+                    .withColumn("email", "string", text=FakerTextUS("ascii_company_email") )
+                    .withColumn("aba_routing", "string", text=FakerTextUS("aba" ))
+                    .withColumn("bank_country", "string", text=FakerTextUS("bank_country") )
+                    .withColumn("account_no", "string", text=FakerTextUS("bban" ))
+                    .withColumn("int_account_no", "string", text=FakerTextUS("iban") )
+                    .withColumn("swift11", "string", text=FakerTextUS("swift11" ))
+                    .withColumn("credit_card_number", text=FakerTextUS("credit_card_number") )
+                    .withColumn("credit_card_provider", text=FakerTextUS("credit_card_provider") )
+                    .withColumn("credit_card_balance", "decimal", minValue=0.01, maxValue=100000, random=True, distribution="normal")
+                    .withColumn("checking_acc_balance", "decimal", minValue=0.01, maxValue=100000, random=True, distribution="normal")
+                    .withColumn("savings_acc_balance", "decimal", minValue=0.01, maxValue=100000, random=True, distribution="normal")
+                    .withColumn("checking_acc_2_balance", "decimal", minValue=0.01, maxValue=100000, random=True, distribution="normal")
+                    .withColumn("savings_acc_2_balance", "decimal", minValue=0.01, maxValue=100000, random=True)
+                    .withColumn("event_type", "string", values=["purchase", "cash_advance"],random=True)
+                    .withColumn("event_ts", "timestamp", begin="2020-01-01 01:00:00",end="2020-12-31 23:59:00",interval="1 minute", random=True, distribution="normal")
+                    .withColumn("longitude", "float", minValue=-180, maxValue=180, random=True)
+                    .withColumn("latitude", "float", minValue=-90, maxValue=90, random=True)
+                    .withColumn("transaction_currency", values=["USD", "EUR", "KWD", "BHD", "GBP", "CHF", "MEX"], distribution="normal")
                     .withColumn("transaction_amount", "decimal", minValue=0.01, maxValue=30000, random=True)
                     )
 
