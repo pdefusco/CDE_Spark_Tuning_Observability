@@ -72,7 +72,8 @@ class BankDataGen:
         self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_partitions_requested)
 
         fakerDataspec = (DataGenerator(self.spark, rows=data_rows, partitions=partitions_requested)
-                    .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name"), dist=skew )
+                    .withColumn("customer_id", "int", minValue=1, maxValue=data_rows, step=1)
+                    .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name"))
                     .withColumn("address", "string", text=FakerTextUS("address" ))
                     .withColumn("email", "string", text=FakerTextUS("ascii_company_email") )
                     .withColumn("aba_routing", "string", text=FakerTextUS("aba" ))
@@ -114,6 +115,7 @@ class BankDataGen:
         self.spark.conf.set("spark.sql.shuffle.partitions", shuffle_partitions_requested)
 
         fakerDataspec = (DataGenerator(self.spark, rows=data_rows, partitions=partitions_requested)
+                    .withColumn("customer_id", "int", minValue=1, maxValue=data_rows, step=1)
                     .withColumn("name", "string", percentNulls=0.1, text=FakerTextUS("name"))
                     .withColumn("address", "string", text=FakerTextUS("address" ))
                     .withColumn("email", "string", text=FakerTextUS("ascii_company_email") )

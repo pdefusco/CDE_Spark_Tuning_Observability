@@ -40,7 +40,6 @@
 from os.path import exists
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from utils import *
 from datetime import datetime
 import sys, random, os, json, random, configparser
 
@@ -48,25 +47,19 @@ import sys, random, os, json, random, configparser
 config = configparser.ConfigParser()
 config.read('/app/mount/parameters.conf')
 demo=config.get("general","demo")
-#username=config.get("general","username")
+
 print("ALL PROVIDED ARGS")
 print(sys.argv)
 
-datagen_partitions = int(sys.argv[1])
-datagen_rows = int(sys.argv[2])
-username = sys.argv[3]
-skew = sys.argv[4]
-
-print("\nRunning as Username: ", username)
+username = sys.argv[1]
+print("Provided username: {}\n".format(username))
 
 dbname = "CDE_DEMO_{0}_{1}".format(username, demo)
 
 print("\nUsing DB Name: ", dbname)
 
-print("Number of Datagen Partitions: {}\n".format(datagen_partitions))
-print("Number of Rows Requested: {}\n".format(datagen_rows))
-print("Skew Option Selected: {}\n".format(skew))
-print("Provided username: {}\n".format(username))
+skew = sys.argv[2]
+print("SKEW: {}\n".format(skew))
 
 #---------------------------------------------------
 #               CREATE SPARK SESSION WITH ICEBERG
@@ -81,39 +74,43 @@ spark = SparkSession \
     .getOrCreate()
 
 #---------------------------------------------------
-#       SQL CLEANUP: DATABASES, TABLES, VIEWS
+#               LOAD DATA
 #---------------------------------------------------
-
-print("JOB STARTED...")
-#spark.sql("DROP DATABASE IF EXISTS {} CASCADE".format(dbname))
-
-spark.sql("CREATE DATABASE IF NOT EXISTS {}".format(dbname))
-
-print("SHOW DATABASES LIKE '{}'".format(dbname))
-spark.sql("SHOW DATABASES LIKE '{}'".format(dbname)).show()
-print("\n")
-
-#---------------------------------------------------
-#               CREATE BATCH DATA
-#---------------------------------------------------
-
-print("CREATING BANKING TRANSACTIONS\n")
-
-dg = BankDataGen(spark, username, datagen_partitions, datagen_rows)
-
-#bankTransactionsDf.writeTo("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))\
-#    .using("iceberg").tableProperty("write.format.default", "parquet").createOrReplace()
 
 if skew == "True":
-    bankTransactionsDf = dg.bankDataGenSkewed()
-    print("CREATING TABLE WITH SKEW\n")
-    bankTransactionsDf.write.mode("overwrite").\
-                        saveAsTable("{0}.BANKING_TRANSACTIONS_SKEWED_{1}".format(dbname, username), format="parquet")
+    bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_SKEWED_{1}".format(dbname, username))
+    print("READING TABLE WITH SKEW\n")
 
 elif skew == "False":
     bankTransactionsDf = dg.bankDataGen()
-    print("CREATING TABLE WITHOUT SKEW\n")
-    bankTransactionsDf.write.mode("overwrite").\
-                        saveAsTable("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username), format="parquet")
+    print("READING TABLE WITHOUT SKEW\n")
+    bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
 
-print("BATCH LOAD JOB COMPLETED\n")
+print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions()))
+
+#---------------------------------------------------
+#               CAUSING THE SHUFFLE..
+#---------------------------------------------------
+
+# Narrow Transformation
+selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
+                            'bank_country', 'transaction_amount',
+                            'transaction_currency', 'credit_card_provider',
+                            'event_type', 'event_ts', 'credit_card_balance',
+                            'checking_acc_balance', 'checking_acc_2_balance',
+                            'savings_acc_balance', 'savings_acc_2_balance')
+
+# Wide Transformation
+print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
+byCountryDf = selectDf.groupBy('transaction_currency') \
+                      .agg({'transaction_amount':'mean'})
+
+#print("SORTING COUNTRIES BY AVG TRANSACTION")
+#byCountryDf_sorted = byCountryDf.sort('avg(transaction_amount)', ascending=[True])
+
+#print("AVERAGE TRANSACTION AMOUNT BY CURRENCY")
+#byCurrencyDf = byCountryDf_sorted.groupBy('transaction_currency') \
+#                            .agg({'credit_card_balance':'mean'})
+
+print("SHOW AVERAGE TRANSACTION AMOUNT BY COUNTRY")
+byCountryDf.show()

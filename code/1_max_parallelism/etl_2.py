@@ -46,15 +46,22 @@ import sys, random, os, json, random, configparser
 ## CDE PROPERTIES
 config = configparser.ConfigParser()
 config.read('/app/mount/parameters.conf')
-data_lake_name=config.get("general","data_lake_name")
 demo=config.get("general","demo")
-username=config.get("general","username")
+
+print("ALL PROVIDED ARGS")
+print(sys.argv)
+
+username = sys.argv[1]
+print("Provided username: {}\n".format(username))
 
 print("\nRunning as Username: ", username)
 
 dbname = "CDE_DEMO_{0}_{1}".format(username, demo)
 
 print("\nUsing DB Name: ", dbname)
+
+skew = sys.argv[2]
+print("SKEW: {}\n".format(skew))
 
 #---------------------------------------------------
 #               CREATE SPARK SESSION WITH ICEBERG
@@ -72,12 +79,19 @@ spark = SparkSession \
 #               LOAD DATA
 #---------------------------------------------------
 
-bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
+if skew == "True":
+    bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_SKEWED_{1}".format(dbname, username))
+    print("READING TABLE WITH SKEW\n")
+
+elif skew == "False":
+    bankTransactionsDf = dg.bankDataGen()
+    print("READING TABLE WITHOUT SKEW\n")
+    bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
 
 print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions()))
 
 #---------------------------------------------------
-#               CAUSING THE SHUFFLE..
+#               Narrow Transformation
 #---------------------------------------------------
 
 # Narrow Transformation
@@ -88,16 +102,65 @@ selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
                             'checking_acc_balance', 'checking_acc_2_balance',
                             'savings_acc_balance', 'savings_acc_2_balance')
 
+#---------------------------------------------------
+#               Wide Transformation
+#---------------------------------------------------
+
 # Wide Transformation
 print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
 byCountryDf = selectDf.groupBy('transaction_currency') \
                       .agg({'transaction_amount':'mean'})
 
-#print("SORTING COUNTRIES BY AVG TRANSACTION")
-#byCountryDf_sorted = byCountryDf.sort('avg(transaction_amount)', ascending=[True])
-
-#print("AVERAGE TRANSACTION AMOUNT BY CURRENCY")
-#byCurrencyDf = byCountryDf_sorted.groupBy('transaction_currency') \
-#                            .agg({'credit_card_balance':'mean'})
-
+print("BYCOUNTRY DF")
 byCountryDf.show()
+
+#---------------------------------------------------
+#               Narrow Transformations
+#---------------------------------------------------
+
+from pyspark.sql.functions import when
+import random
+
+# Wide Transformation
+transfDf = selectDf.withColumn("checking_1_rev", when(selectDf.checking_acc_balance < 1000, 1000)\
+                            .otherwise(selectDf.checking_acc_balance * random.random() * 1000))
+
+transfDf = transfDf.withColumn("checking_2_rev", when(transfDf.checking_acc_2_balance < 1000, 1000)\
+                            .otherwise(transfDf.checking_acc_balance * random.random() * 100))
+
+transfDf = transfDf.withColumn("savings_1_rev", when(transfDf.savings_acc_balance < 5000, 5000)\
+                            .otherwise(transfDf.savings_acc_balance * random.random() * 100))
+
+transfDf = transfDf.withColumn("savings_2_rev", when(transfDf.savings_acc_2_balance < 5000, 5000)\
+                            .otherwise(transfDf.savings_acc_2_balance * random.random() * 100))
+print("TRANSF DF")
+transfDf.show()
+
+#---------------------------------------------------
+#               Wide Transformation
+#---------------------------------------------------
+
+print("ROLLUP DF")
+rollUpDf = transfDf.rollup("bank_country", "event_type").count().orderBy("bank_country", "event_type")
+rollUpDf.show()
+
+#---------------------------------------------------
+#               Wide Transformation
+#---------------------------------------------------
+
+selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
+                            'bank_country', 'transaction_amount',
+                            'transaction_currency', 'credit_card_provider',
+                            'event_type', 'event_ts', 'credit_card_balance',
+                            'checking_acc_balance', 'checking_acc_2_balance',
+                            'savings_acc_balance', 'savings_acc_2_balance')
+
+
+
+
+#---------------------------------------------------
+#               Wide Transformation
+#---------------------------------------------------
+
+#print("SHOW AVERAGE TRANSACTION AMOUNT BY COUNTRY")
+#transfDf.show()
