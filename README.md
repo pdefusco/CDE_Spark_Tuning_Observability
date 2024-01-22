@@ -53,7 +53,7 @@ cde job create --name datagen-max-parallel \
                --runtime-image-resource-name dex-spark-dbldatagen-max-parallel
 
 cde job run --name datagen-max-parallel \
-           --executor-cores 10 \
+           --executor-cores 5 \
            --executor-memory "10g" \
            --min-executors 1 \
            --max-executors 20 \
@@ -63,7 +63,7 @@ cde job run --name datagen-max-parallel \
            --arg True
 
 cde job run --name datagen-max-parallel \
-          --executor-cores 10 \
+          --executor-cores 5 \
           --executor-memory "10g" \
           --min-executors 1 \
           --max-executors 40 \
@@ -91,7 +91,7 @@ Run with Static Allocation:
 
 ```
 cde job run --name etl1 \
-            --executor-cores 10 \
+            --executor-cores 5 \
             --executor-memory "10g" \
             --driver-cores 2 \
             --driver-memory "2g" \
@@ -121,7 +121,7 @@ Run with Dynamic Allocation:
 
 ```
 cde job run --name etl1 \
-            --executor-cores 10 \
+            --executor-cores 5 \
             --executor-memory "8g" \
             --min-executors 1 \
             --max-executors 10 \
@@ -168,7 +168,7 @@ cde job create --name etl2 \
                --mount-1-resource max_parallel
 
 cde job run --name etl2 \
-           --executor-cores 10 \
+           --executor-cores 5 \
            --executor-memory "8g" \
            --min-executors 1 \
            --max-executors 10 \
