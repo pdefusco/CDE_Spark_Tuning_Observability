@@ -1,5 +1,5 @@
 #****************************************************************************
-# (C) Cloudera, Inc. 2020-2023
+# (C) Cloudera, Inc. 2020-2024
 #  All rights reserved.
 #
 #  Applicable Open Source License: GNU Affero General Public License v3.0
@@ -105,15 +105,26 @@ dg = BankDataGen(spark, username, datagen_partitions, datagen_rows)
 #    .using("iceberg").tableProperty("write.format.default", "parquet").createOrReplace()
 
 if skew == "True":
-    bankTransactionsDf = dg.bankDataGenSkewed()
-    print("CREATING TABLE WITH SKEW\n")
-    bankTransactionsDf.write.mode("overwrite").\
-                        saveAsTable("{0}.BANKING_TRANSACTIONS_SKEWED_{1}".format(dbname, username), format="parquet")
+    bankTransactionsDfLeft = dg.bankDataGenSkewed()
+    print("CREATING LEFT TABLE WITH SKEW\n")
+    bankTransactionsDfLeft.write.mode("overwrite").\
+                        saveAsTable("{0}.BANKING_TRANSACTIONS_SKEWED_LEFT_{1}".format(dbname, username), format="parquet")
+
+    bankTransactionsDfRight = dg.bankDataGenSkewed()
+    print("CREATING RIGHT TABLE WITH SKEW\n")
+    bankTransactionsDfRight.write.mode("overwrite").\
+                        saveAsTable("{0}.BANKING_TRANSACTIONS_SKEWED_RIGHT_{1}".format(dbname, username), format="parquet")
+
 
 elif skew == "False":
-    bankTransactionsDf = dg.bankDataGen()
-    print("CREATING TABLE WITHOUT SKEW\n")
-    bankTransactionsDf.write.mode("overwrite").\
-                        saveAsTable("{0}.BANKING_TRANSACTIONS_{1}".format(dbname, username), format="parquet")
+    bankTransactionsDfLeft = dg.bankDataGen()
+    print("CREATING LEFT TABLE WITHOUT SKEW\n")
+    bankTransactionsDfLeft.write.mode("overwrite").\
+                        saveAsTable("{0}.BANKING_TRANSACTIONS_RIGHT_{1}".format(dbname, username), format="parquet")
+
+    bankTransactionsDfRight = dg.bankDataGen()
+    print("CREATING RIGHT TABLE WITHOUT SKEW\n")
+    bankTransactionsDfRight.write.mode("overwrite").\
+                        saveAsTable("{0}.BANKING_TRANSACTIONS_RIGHT_{1}".format(dbname, username), format="parquet")
 
 print("BATCH LOAD JOB COMPLETED\n")

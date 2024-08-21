@@ -78,31 +78,47 @@ spark = SparkSession \
 #---------------------------------------------------
 
 if skew == "True":
-    bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_SKEWED_{1}".format(dbname, username))
+    bankingDfLeft = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_SKEWED_LEFT_{1}".format(dbname, username))
+    bankingDfRight = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_SKEWED_RIGHT_{1}".format(dbname, username))
     print("READING TABLE WITH SKEW\n")
 
 elif skew == "False":
     bankTransactionsDf = dg.bankDataGen()
     print("READING TABLE WITHOUT SKEW\n")
-    bankingDf = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_{1}".format(dbname, username))
+    bankingDfLeft = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_LEFT_{1}".format(dbname, username))
+    bankingDfRight = spark.sql("SELECT * FROM {0}.BANKING_TRANSACTIONS_RIGHT_{1}".format(dbname, username))
 
-print("Print Number of Partitions: {}".format(bankingDf.rdd.getNumPartitions()))
+print("Number of Partitions (LEFT): {}".format(bankingDfLeft.rdd.getNumPartitions()))
+print("Number of Partitions (RIGHT): {}".format(bankingDfRight.rdd.getNumPartitions()))
 
 #---------------------------------------------------
-#               CAUSING THE SHUFFLE..
+#               NARROW TRANSFORMATION
 #---------------------------------------------------
 
 # Narrow Transformation
-selectDf = bankingDf.select('name', 'address', 'email', 'aba_routing',
-                            'bank_country', 'transaction_amount',
-                            'transaction_currency', 'credit_card_provider',
-                            'event_type', 'event_ts', 'credit_card_balance',
+selectDfLeft = bankingDfLeft.select('customer_id', 'name', 'address', 'email',
+                            'aba_routing','bank_country',
                             'checking_acc_balance', 'checking_acc_2_balance',
                             'savings_acc_balance', 'savings_acc_2_balance')
 
+# Narrow Transformation
+selectDfRight = bankingDfLeft.select('customer_id', 'credit_card_number',
+                                    'credit_card_provider', 'credit_card_balance',
+                                    'transaction_amount', 'transaction_currency')
+
+#---------------------------------------------------
+#               WIDE TRANSFORMATION (JOIN)
+#---------------------------------------------------
+
+joinDf = selectDfLeft.join(selectDfRight, selectDfLeft.customer_id == selectDfRight.customer_id, 'inner')
+
+#---------------------------------------------------
+#               WIDE TRANSFORMATION (GROUP BY)
+#---------------------------------------------------
+
 # Wide Transformation
 print("AVERAGE TRANSACTION AMOUNT BY COUNTRY")
-byCountryDf = selectDf.groupBy('transaction_currency') \
+byCountryDf = joinDf.groupBy('bank_country') \
                       .agg({'transaction_amount':'mean'})
 
 #print("SORTING COUNTRIES BY AVG TRANSACTION")

@@ -54,12 +54,12 @@ cde job create --name datagen-max-parallel \
 
 cde job run --name datagen-max-parallel \
            --executor-cores 5 \
-           --executor-memory "10g" \
+           --executor-memory "5g" \
            --min-executors 1 \
            --max-executors 20 \
            --arg 100 \
-           --arg 1000000000 \
-           --arg pdefusco_dec23 \
+           --arg 1000000 \
+           --arg pdefusco_012523 \
            --arg True
 
 cde job run --name datagen-max-parallel \
@@ -97,7 +97,7 @@ cde job run --name etl1 \
             --driver-memory "2g" \
             --conf spark.dynamicAllocation.enabled=False \
             --conf=spark.executor.instances=10 \
-            --arg pdefusco_dec_17_23
+            --arg pdefusco_012523
 ```
 
 Spark UI Key Takeaways:
